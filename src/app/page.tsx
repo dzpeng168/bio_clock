@@ -73,7 +73,9 @@ export default async function LandingPage() {
           </Link>
         </div>
         <p className="mt-4 text-xs text-slate-400">
-          {demo ? "当前为演示模式，可直接体验全部功能，数据仅存于本地进程" : "已有账户？登录后继续你的逆龄之旅"}
+          {demo
+            ? "当前为演示模式，可直接体验全部功能，数据仅存于本地进程"
+            : "免登录游客模式即可完成首次快测；已有账户？登录后继续你的逆龄之旅"}
         </p>
       </section>
 

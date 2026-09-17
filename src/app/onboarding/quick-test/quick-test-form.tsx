@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { submitTestAction } from "@/lib/actions";
+import { computeBioAge } from "@/lib/bioage";
 import type { MeasureMode, PhysicalTests, QuickTestAnswers } from "@/lib/domain";
+import { readGuestProfile, saveGuestResult } from "@/lib/guest";
 import { ArrowLeftIcon } from "@/components/icons";
 import { Button, Card, cn } from "@/components/ui";
 
@@ -12,10 +14,12 @@ export function QuickTestForm({
   mode,
   redirectTo,
   stepLabel,
+  guest = false,
 }: {
   mode: MeasureMode;
   redirectTo: string;
   stepLabel?: string;
+  guest?: boolean;
 }) {
   const router = useRouter();
   const standard = mode === "standard";
@@ -61,6 +65,18 @@ export function QuickTestForm({
   async function onSubmit() {
     setSubmitting(true);
     setError("");
+    if (guest) {
+      // 游客模式：读取本机暂存的基础信息，本地计算并暂存结果
+      const profile = readGuestProfile();
+      if (!profile) {
+        router.push("/onboarding/basic-info");
+        return;
+      }
+      const result = computeBioAge(profile, a, standard ? t : undefined, mode);
+      saveGuestResult({ ...result, id: "guest", createdAt: new Date().toISOString() });
+      router.push(redirectTo);
+      return;
+    }
     const res = await submitTestAction({
       answers: a,
       tests: standard ? t : undefined,
@@ -88,6 +104,9 @@ export function QuickTestForm({
       <h1 className="text-2xl font-bold text-slate-900">
         {standard ? "标准测" : "首次快测"}
       </h1>
+      {guest && (
+        <p className="mt-1 text-xs text-emerald-600">游客模式 · 结果暂存本机，登录后可保存</p>
+      )}
 
       {/* 进度条 */}
       <div className="mt-4 flex gap-1.5">
@@ -143,7 +162,7 @@ export function QuickTestForm({
               <Segmented
                 label="作息规律性"
                 value={a.sleepRegularity}
-                items={["很不规律", "", "一般", "", "很规律"]}
+                items={["很不规律", "较不规律", "一般", "较规律", "很规律"]}
                 onChange={(v) => setA({ ...a, sleepRegularity: v })}
               />
             </>
@@ -218,13 +237,13 @@ export function QuickTestForm({
               <Segmented
                 label="饮食质量自评"
                 value={a.dietQuality}
-                items={["外卖为主", "", "均衡", "", "蔬果全谷"]}
+                items={["外卖为主", "偏外卖", "均衡", "偏健康", "蔬果全谷"]}
                 onChange={(v) => setA({ ...a, dietQuality: v })}
               />
               <Segmented
                 label="压力自评"
                 value={a.stress}
-                items={["很低", "", "中等", "", "很高"]}
+                items={["很低", "较低", "中等", "较高", "很高"]}
                 onChange={(v) => setA({ ...a, stress: v })}
               />
             </>
@@ -361,7 +380,12 @@ function Segmented({
   return (
     <div>
       <label className="text-sm font-medium text-slate-700">{label}</label>
-      <div className="mt-2 grid grid-cols-5 gap-1.5">
+      <div
+        className={cn(
+          "mt-2 grid gap-1.5",
+          items.length === 4 ? "grid-cols-4" : "grid-cols-5"
+        )}
+      >
         {items.map((item, i) => (
           <button
             key={i}
@@ -372,9 +396,9 @@ function Segmented({
                 ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
             )}
-            title={item || `${i + 1}`}
+            title={item}
           >
-            {item || i + 1}
+            {item}
           </button>
         ))}
       </div>

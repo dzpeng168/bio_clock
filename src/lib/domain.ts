@@ -220,6 +220,31 @@ export const ALL_BEHAVIORS: BehaviorDef[] = [
 export const behaviorByKey = (key: string) =>
   ALL_BEHAVIORS.find((b) => b.key === key);
 
+/** 短板维度 → 高杠杆低门槛的候选行为（PRD 用户旅程步骤 6） */
+export const RECOMMEND_MAP: Record<DimensionKey, string[]> = {
+  cardio: ["aerobic", "mindfulness"],
+  metabolic: ["diet", "strength"],
+  musculoskeletal: ["strength", "aerobic"],
+  sleep: ["sleep", "mindfulness"],
+  lifestyle: ["mindfulness", "diet"],
+};
+
+/** 按短板排序推荐最多 3 个启动行为 */
+export function recommendStarters(dimensions: DimensionResult[]): BehaviorDef[] {
+  const sorted = [...dimensions].sort((a, b) => b.offset - a.offset);
+  const keys: string[] = [];
+  for (const d of sorted) {
+    for (const k of RECOMMEND_MAP[d.key]) {
+      if (!keys.includes(k)) keys.push(k);
+      if (keys.length >= 3) break;
+    }
+    if (keys.length >= 3) break;
+  }
+  return keys
+    .map((k) => behaviorByKey(k))
+    .filter((b): b is BehaviorDef => Boolean(b));
+}
+
 /** 日结算（PRD 4.5）：净值 N → 反馈文案 + 预测轨迹影响（岁） */
 export function settlement(net: number): {
   title: string;

@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { claimGuestDataAction } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
+import { clearGuestData, readGuestProfile, readGuestResult } from "@/lib/guest";
 import { Button, Card } from "@/components/ui";
 
 export function LoginForm({ demo }: { demo: boolean }) {
@@ -12,6 +14,15 @@ export function LoginForm({ demo }: { demo: boolean }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  /** 登录成功后认领游客模式暂存的数据（失败不影响登录流程） */
+  async function tryClaimGuestData() {
+    const profile = readGuestProfile();
+    const measurement = readGuestResult();
+    if (!profile || !measurement) return;
+    const res = await claimGuestDataAction({ profile, measurement });
+    if (res.ok) clearGuestData();
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,6 +37,11 @@ export function LoginForm({ demo }: { demo: boolean }) {
       if (error) {
         setError(error.message);
         return;
+      }
+      try {
+        await tryClaimGuestData();
+      } catch {
+        // 认领失败不影响登录
       }
       router.replace("/today");
       router.refresh();

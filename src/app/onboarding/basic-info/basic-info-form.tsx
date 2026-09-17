@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { saveProfileAction } from "@/lib/actions";
 import type { Gender, Goal } from "@/lib/domain";
-import { GOAL_LABELS } from "@/lib/domain";
+import { GOAL_LABELS, calendarAge } from "@/lib/domain";
+import { saveGuestProfile } from "@/lib/guest";
 import { Button, Card, cn } from "@/components/ui";
 
 const GOALS: { key: Goal; desc: string }[] = [
@@ -13,7 +14,7 @@ const GOALS: { key: Goal; desc: string }[] = [
   { key: "prevent", desc: "指标临界或有家族史，需要可执行的非药物干预路径" },
 ];
 
-export function BasicInfoForm() {
+export function BasicInfoForm({ guest = false }: { guest?: boolean }) {
   const router = useRouter();
   const [birthDate, setBirthDate] = useState("1990-01-01");
   const [gender, setGender] = useState<Gender>("male");
@@ -26,6 +27,18 @@ export function BasicInfoForm() {
   async function onNext() {
     setSaving(true);
     setError("");
+    if (guest) {
+      // 游客模式：本地校验后暂存，直接进入快测
+      const age = calendarAge(birthDate);
+      if (age < 18 || age > 100) {
+        setError("年龄需在 18–100 岁之间");
+        setSaving(false);
+        return;
+      }
+      saveGuestProfile({ birthDate, gender, heightCm, weightKg, goal });
+      router.push("/onboarding/quick-test");
+      return;
+    }
     const res = await saveProfileAction({ birthDate, gender, heightCm, weightKg, goal });
     if (res.ok) router.push("/onboarding/quick-test");
     else {
@@ -41,6 +54,11 @@ export function BasicInfoForm() {
       <p className="mt-2 text-sm text-slate-500">
         这些信息用于计算你的日历年龄与体成分维度，仅自己可见。
       </p>
+      {guest && (
+        <p className="mt-1 text-xs text-emerald-600">
+          游客模式 · 无需注册，完成快测后可再决定是否保存结果
+        </p>
+      )}
 
       <Card className="mt-6 flex-1 space-y-6 p-5 sm:p-6">
         <div>

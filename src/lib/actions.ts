@@ -6,6 +6,7 @@ import { computeBioAge } from "@/lib/bioage";
 import {
   calendarAge,
   type DailySummary,
+  type Measurement,
   type MeasureMode,
   type PhysicalTests,
   type Profile,
@@ -58,6 +59,35 @@ export async function submitTestAction(input: {
   }
   revalidatePath("/", "layout");
   redirect(input.redirectTo);
+}
+
+/** 游客模式数据认领：登录后将本机暂存的基础信息与快测结果保存到账户 */
+export async function claimGuestDataAction(input: {
+  profile: Profile;
+  measurement: Measurement;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, error: "未登录" };
+    // 已有账户数据时不覆盖，仅首次认领
+    const existing = await getProfile();
+    if (!existing) {
+      await saveProfile({ ...input.profile, onboardedAt: new Date().toISOString() });
+      await saveMeasurement({
+        mode: input.measurement.mode,
+        bioAge: input.measurement.bioAge,
+        calendarAge: input.measurement.calendarAge,
+        delta: input.measurement.delta,
+        confidence: input.measurement.confidence,
+        dimensions: input.measurement.dimensions,
+        algorithmVersion: input.measurement.algorithmVersion,
+      });
+      revalidatePath("/", "layout");
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "保存失败" };
+  }
 }
 
 export async function toggleBehaviorAction(key: string): Promise<DailySummary> {
