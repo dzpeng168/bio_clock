@@ -1,29 +1,28 @@
 import { notFound, redirect } from "next/navigation";
 import { getProfile } from "@/lib/data/queries";
-import { QuickTestForm } from "@/app/onboarding/quick-test/quick-test-form";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { resolveLocale } from "@/lib/i18n/server";
+import { QuickTestForm } from "@/app/[locale]/onboarding/quick-test/quick-test-form";
 
 export const dynamic = "force-dynamic";
-
-const MODES = {
-  quick: { title: "快测", metadata: "快测" },
-  standard: { title: "标准测", metadata: "标准测" },
-} as const;
 
 export default async function MeasureModePage({
   params,
 }: {
-  params: Promise<{ mode: string }>;
+  params: Promise<{ locale: string; mode: string }>;
 }) {
   const { mode } = await params;
   if (mode !== "quick" && mode !== "standard") notFound();
+  const locale = await resolveLocale(params);
+  const t = getDictionary(locale);
   const profile = await getProfile();
-  if (!profile) redirect("/onboarding/basic-info");
+  if (!profile) redirect(`/${locale}/onboarding/basic-info`);
 
   return (
     <QuickTestForm
       mode={mode}
-      redirectTo="/measure/result"
-      stepLabel={`${MODES[mode as keyof typeof MODES].title} · 约 ${mode === "quick" ? "3" : "10"} 分钟`}
+      redirectTo={`/${locale}/measure/result`}
+      stepLabel={`${t.measure.modes[mode].label} · ${t.measure.modes[mode].time}`}
     />
   );
 }

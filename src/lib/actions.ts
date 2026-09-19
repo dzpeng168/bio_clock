@@ -92,7 +92,7 @@ export async function claimGuestDataAction(input: {
 
 export async function toggleBehaviorAction(key: string): Promise<DailySummary> {
   const summary = await toggleBehavior(key);
-  revalidatePath("/today");
+  revalidatePath("/", "layout");
   return summary;
 }
 
@@ -101,8 +101,7 @@ export async function savePlanAction(behaviorKeys: string[]): Promise<{ ok: true
     if (behaviorKeys.length < 1 || behaviorKeys.length > 3)
       throw new Error("请选择 1–3 个启动行为");
     await savePlan(behaviorKeys);
-    revalidatePath("/plan");
-    revalidatePath("/today");
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "保存失败" };

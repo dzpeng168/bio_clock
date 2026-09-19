@@ -10,11 +10,13 @@ import {
 } from "recharts";
 import type { Measurement } from "@/lib/domain";
 import { fmt1 } from "@/lib/domain";
+import { useI18n } from "@/lib/i18n/client";
 
 /** 五维雷达图：各维度等效年龄 vs 日历年龄 */
 export function DimensionRadar({ m }: { m: Measurement }) {
+  const { t, f, dimension } = useI18n();
   const data = m.dimensions.map((d) => ({
-    dim: d.label,
+    dim: dimension(d.key),
     age: d.age,
     calendar: m.calendarAge,
   }));
@@ -30,14 +32,14 @@ export function DimensionRadar({ m }: { m: Measurement }) {
           <PolarAngleAxis dataKey="dim" tick={{ fontSize: 12, fill: "#64748b" }} />
           <PolarRadiusAxis domain={[min, max]} tick={false} axisLine={false} />
           <Radar
-            name="日历年龄"
+            name={t.trends.chartCalendarLine}
             dataKey="calendar"
             stroke="#94a3b8"
             strokeDasharray="4 4"
             fill="none"
           />
           <Radar
-            name="维度年龄"
+            name={t.result.radarTitle}
             dataKey="age"
             stroke="#059669"
             strokeWidth={2}
@@ -49,11 +51,11 @@ export function DimensionRadar({ m }: { m: Measurement }) {
       <div className="mt-1 flex items-center justify-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-full bg-emerald-500" />
-          维度等效年龄
+          {t.result.radarLegend}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-full border-2 border-dashed border-slate-400" />
-          日历年龄 {fmt1(m.calendarAge)} 岁
+          {f(t.trends.chartCalendar, { age: fmt1(m.calendarAge), unit: t.result.yearsUnit })}
         </span>
       </div>
     </div>

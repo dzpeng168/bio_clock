@@ -1,14 +1,19 @@
 // 领域类型与常量（对照 PRD 第二章/第四章）
+// 展示文案统一收敛到 @/lib/i18n 字典，此处只保留 key 与数值逻辑
+
+import type { Locale } from "@/lib/i18n/config";
 
 export type Gender = "male" | "female";
 export type Goal = "understand" | "improve" | "prevent";
 export type MeasureMode = "quick" | "standard" | "deep";
 
-export const GOAL_LABELS: Record<Goal, string> = {
-  understand: "了解真实状态",
-  improve: "改善习惯",
-  prevent: "慢病预防",
-};
+/** 可解释归因：code 对应 dict.domain.reasons，params 用于模板插值 */
+export interface Reason {
+  code: string;
+  params?: Record<string, string | number>;
+}
+/** 兼容历史数据中以明文存储的归因 */
+export type ReasonLike = Reason | string;
 
 export interface Profile {
   birthDate: string; // YYYY-MM-DD
@@ -50,10 +55,9 @@ export type DimensionKey =
 
 export interface DimensionResult {
   key: DimensionKey;
-  label: string;
   age: number; // 该维度等效年龄
   offset: number; // 相对日历年龄的偏移（岁）
-  reasons: string[]; // 可解释归因
+  reasons: ReasonLike[]; // 可解释归因（字典 code，兼容历史明文）
 }
 
 export interface Measurement {
@@ -68,7 +72,9 @@ export interface Measurement {
   createdAt: string;
 }
 
-/** 每日结算摘要 */
+/** 日结算文案分支：对应 dict.domain.settlement */
+export type SettlementKey = "highPos" | "pos" | "neutral" | "neg" | "highNeg";
+
 export interface DailySummary {
   date: string;
   positiveKeys: string[];
@@ -76,140 +82,52 @@ export interface DailySummary {
   positive: number; // 健康资产
   negative: number; // 老化负债（绝对值）
   net: number; // 净值 N
-  title: string; // 结算文案
+  settlementKey: SettlementKey; // 结算文案字典键
   tone: "positive" | "negative" | "neutral";
   drift: number; // 对预测轨迹的影响（岁）
-  daysText: string;
 }
+
+/** 行为 key：文案见 dict.domain.behaviors */
+export type BehaviorKey =
+  | "aerobic"
+  | "strength"
+  | "sleep"
+  | "diet"
+  | "mindfulness"
+  | "water"
+  | "social"
+  | "late_sleep"
+  | "smoke_drink"
+  | "sedentary"
+  | "sugar_salt"
+  | "screen_before_bed"
+  | "chronic_stress";
 
 /** 每日行为定义（PRD 4.3 / 4.4；网页端为手动打卡） */
 export interface BehaviorDef {
-  key: string;
-  label: string;
-  criteria: string; // 判定标准
+  key: BehaviorKey;
   score: number;
   direction: 1 | -1;
-  mechanism: string; // 机制说明
   capGroup?: string; // 单项日封顶组（PRD 4.5：运动每日最多 +6）
-  remedy?: string; // 负向行为的挽回方案（PRD 4.1：负反馈必带替代方案）
 }
 
 export const POSITIVE_BEHAVIORS: BehaviorDef[] = [
-  {
-    key: "aerobic",
-    label: "有氧运动",
-    criteria: "≥30 分钟中等强度",
-    score: 3,
-    direction: 1,
-    mechanism: "提升心肺功能与 VO₂max",
-    capGroup: "exercise",
-  },
-  {
-    key: "strength",
-    label: "力量训练",
-    criteria: "≥20 分钟，每周 ≥2 次有加成",
-    score: 3,
-    direction: 1,
-    mechanism: "对抗 30 岁后每年 1% 的肌肉流失",
-    capGroup: "exercise",
-  },
-  {
-    key: "sleep",
-    label: "达标睡眠",
-    criteria: "7–9 小时且入睡规律",
-    score: 3,
-    direction: 1,
-    mechanism: "深睡修复、HRV 提升",
-  },
-  {
-    key: "diet",
-    label: "饮食质量",
-    criteria: "蔬果 ≥400g 或全谷物、少加工",
-    score: 2,
-    direction: 1,
-    mechanism: "抗炎、血糖平稳",
-  },
-  {
-    key: "mindfulness",
-    label: "正念减压",
-    criteria: "呼吸 / 冥想 ≥10 分钟",
-    score: 2,
-    direction: 1,
-    mechanism: "降低皮质醇与静息心率",
-  },
-  {
-    key: "water",
-    label: "足量饮水",
-    criteria: "1500–2000 ml",
-    score: 1,
-    direction: 1,
-    mechanism: "维持代谢效率",
-  },
-  {
-    key: "social",
-    label: "社交连接",
-    criteria: "线下面对面交流 ≥30 分钟",
-    score: 1,
-    direction: 1,
-    mechanism: "长寿蓝区研究的核心因子",
-  },
+  { key: "aerobic", score: 3, direction: 1, capGroup: "exercise" },
+  { key: "strength", score: 3, direction: 1, capGroup: "exercise" },
+  { key: "sleep", score: 3, direction: 1 },
+  { key: "diet", score: 2, direction: 1 },
+  { key: "mindfulness", score: 2, direction: 1 },
+  { key: "water", score: 1, direction: 1 },
+  { key: "social", score: 1, direction: 1 },
 ];
 
 export const NEGATIVE_BEHAVIORS: BehaviorDef[] = [
-  {
-    key: "late_sleep",
-    label: "熬夜",
-    criteria: "睡眠 <6h 或 0 点后入睡",
-    score: 3,
-    direction: -1,
-    mechanism: "皮质醇升高、深睡受损",
-    remedy: "今晚 23 点前入睡，明天可追回约 0.5 天",
-  },
-  {
-    key: "smoke_drink",
-    label: "吸烟 / 过量饮酒",
-    criteria: "任何吸烟；酒精 >15g/日",
-    score: 3,
-    direction: -1,
-    mechanism: "证据最明确的加速衰老因子",
-    remedy: "设置每周上限并逐步减半，任何一次减少都计正向",
-  },
-  {
-    key: "sedentary",
-    label: "久坐",
-    criteria: "单次 >60 分钟或全天 >8h",
-    score: 2,
-    direction: -1,
-    mechanism: "血流瘀滞、代谢下降",
-    remedy: "每小时起身活动 3 分钟，全天打断 4 次即可抵消大半",
-  },
-  {
-    key: "sugar_salt",
-    label: "高糖高盐",
-    criteria: "添加糖 >25g 或钠 >5g",
-    score: 2,
-    direction: -1,
-    mechanism: "糖化反应、血压升高",
-    remedy: "下一餐先吃蔬果与蛋白质，可减缓血糖波动",
-  },
-  {
-    key: "screen_before_bed",
-    label: "睡前屏幕",
-    criteria: "入睡前 1 小时蓝光暴露",
-    score: 1,
-    direction: -1,
-    mechanism: "入睡延迟、深睡减少",
-    remedy: "睡前 30 分钟改听音频或纸质书",
-  },
-  {
-    key: "chronic_stress",
-    label: "持续高压",
-    criteria: "压力自评连续 ≥2 天偏高",
-    score: 1,
-    direction: -1,
-    mechanism: "慢性炎症因子升高",
-    remedy: "10 分钟盒式呼吸练习，今晚即可完成",
-  },
+  { key: "late_sleep", score: 3, direction: -1 },
+  { key: "smoke_drink", score: 3, direction: -1 },
+  { key: "sedentary", score: 2, direction: -1 },
+  { key: "sugar_salt", score: 2, direction: -1 },
+  { key: "screen_before_bed", score: 1, direction: -1 },
+  { key: "chronic_stress", score: 1, direction: -1 },
 ];
 
 export const ALL_BEHAVIORS: BehaviorDef[] = [
@@ -245,47 +163,17 @@ export function recommendStarters(dimensions: DimensionResult[]): BehaviorDef[] 
     .filter((b): b is BehaviorDef => Boolean(b));
 }
 
-/** 日结算（PRD 4.5）：净值 N → 反馈文案 + 预测轨迹影响（岁） */
+/** 日结算（PRD 4.5）：净值 N → 文案字典键 + 预测轨迹影响（岁） */
 export function settlement(net: number): {
-  title: string;
+  settlementKey: SettlementKey;
   tone: "positive" | "negative" | "neutral";
   drift: number;
-  daysText: string;
 } {
-  if (net >= 4)
-    return {
-      title: "今天年轻了约 1.5 天",
-      tone: "positive",
-      drift: -0.04,
-      daysText: "≈ 年轻 1.5 天",
-    };
-  if (net >= 1)
-    return {
-      title: "今天年轻了 0.3–1 天",
-      tone: "positive",
-      drift: -0.02,
-      daysText: "≈ 年轻 0.3–1 天",
-    };
-  if (net === 0)
-    return {
-      title: "今天持平，维持住了",
-      tone: "neutral",
-      drift: 0,
-      daysText: "持平",
-    };
-  if (net > -4)
-    return {
-      title: "今天老了 0.3–1 天",
-      tone: "negative",
-      drift: 0.02,
-      daysText: "≈ 老 0.3–1 天",
-    };
-  return {
-    title: "今天老了约 1.5 天",
-    tone: "negative",
-    drift: 0.04,
-    daysText: "≈ 老 1.5 天",
-  };
+  if (net >= 4) return { settlementKey: "highPos", tone: "positive", drift: -0.04 };
+  if (net >= 1) return { settlementKey: "pos", tone: "positive", drift: -0.02 };
+  if (net === 0) return { settlementKey: "neutral", tone: "neutral", drift: 0 };
+  if (net > -4) return { settlementKey: "neg", tone: "negative", drift: 0.02 };
+  return { settlementKey: "highNeg", tone: "negative", drift: 0.04 };
 }
 
 /* ---------- 工具 ---------- */
@@ -310,9 +198,33 @@ export function calendarAge(birthDate: string): number {
   return age;
 }
 
-export function fmtDateCN(key: string): string {
-  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-  const [y, m, d] = key.split("-").map(Number);
-  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  return `${m}月${d}日 周${weekdays[wd]}`;
+/** 日期键 YYYY-MM-DD → 本地化短日期（zh：9月17日周三 / en：Wed, Sep 17） */
+export function fmtDate(key: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${key}T00:00:00Z`));
+}
+
+const dateTimeLocale = (locale: Locale) => (locale === "zh" ? "zh-CN" : "en-US");
+
+/** ISO 时间戳 → 月日（zh：9月17日 / en：September 17） */
+export function fmtMonthDay(iso: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(dateTimeLocale(locale), {
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(iso));
+}
+
+/** ISO 时间戳 → 完整日期（zh：2026/9/17 / en：9/17/2026） */
+export function fmtFullDate(iso: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(dateTimeLocale(locale), {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(iso));
 }

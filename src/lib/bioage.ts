@@ -8,15 +8,17 @@ import type {
   PhysicalTests,
   Profile,
   QuickTestAnswers,
+  Reason,
 } from "./domain";
 import { calendarAge } from "./domain";
 
-export const DIMENSION_WEIGHTS: { key: DimensionKey; label: string; weight: number }[] = [
-  { key: "cardio", label: "心血管", weight: 0.25 },
-  { key: "metabolic", label: "代谢", weight: 0.2 },
-  { key: "musculoskeletal", label: "肌肉骨骼", weight: 0.2 },
-  { key: "sleep", label: "睡眠恢复", weight: 0.15 },
-  { key: "lifestyle", label: "生活方式", weight: 0.2 },
+/** 维度权重；维度名见 dict.domain.dimensions */
+export const DIMENSION_WEIGHTS: { key: DimensionKey; weight: number }[] = [
+  { key: "cardio", weight: 0.25 },
+  { key: "metabolic", weight: 0.2 },
+  { key: "musculoskeletal", weight: 0.2 },
+  { key: "sleep", weight: 0.15 },
+  { key: "lifestyle", weight: 0.2 },
 ];
 
 const clamp = (v: number, min: number, max: number) =>
@@ -29,8 +31,8 @@ function dimensionOffsets(
   p: Profile,
   a: QuickTestAnswers,
   t?: PhysicalTests
-): Record<DimensionKey, { offset: number; reasons: string[] }> {
-  const r: Record<DimensionKey, { offset: number; reasons: string[] }> = {
+): Record<DimensionKey, { offset: number; reasons: Reason[] }> {
+  const r: Record<DimensionKey, { offset: number; reasons: Reason[] }> = {
     cardio: { offset: 0, reasons: [] },
     metabolic: { offset: 0, reasons: [] },
     musculoskeletal: { offset: 0, reasons: [] },
@@ -41,54 +43,54 @@ function dimensionOffsets(
   // 心血管：静息心率 + 有氧频率
   if (a.restingHr < 55) {
     r.cardio.offset -= 3;
-    r.cardio.reasons.push("静息心率优秀，心肺状态好于同龄");
+    r.cardio.reasons.push({ code: "rhrExcellent" });
   } else if (a.restingHr < 65) {
     r.cardio.offset -= 1.5;
-    r.cardio.reasons.push("静息心率处于健康区间");
+    r.cardio.reasons.push({ code: "rhrHealthy" });
   } else if (a.restingHr > 85) {
     r.cardio.offset += 4;
-    r.cardio.reasons.push("静息心率偏高，建议关注");
+    r.cardio.reasons.push({ code: "rhrHigh" });
   } else if (a.restingHr > 75) {
     r.cardio.offset += 2;
-    r.cardio.reasons.push("静息心率略高于理想值");
+    r.cardio.reasons.push({ code: "rhrSlightlyHigh" });
   }
   if (a.aerobicDays >= 3) {
     r.cardio.offset -= 1;
-    r.cardio.reasons.push("规律有氧在持续提升心肺能力");
+    r.cardio.reasons.push({ code: "aerobicGood" });
   } else if (a.aerobicDays === 0) {
     r.cardio.offset += 1;
-    r.cardio.reasons.push("缺少有氧运动，心肺刺激不足");
+    r.cardio.reasons.push({ code: "aerobicNone" });
   }
 
   // 代谢：BMI + 饮食质量
   const bmi = p.weightKg / Math.pow(p.heightCm / 100, 2);
   if (bmi >= 28) {
     r.metabolic.offset += 3;
-    r.metabolic.reasons.push(`BMI ${round1(bmi)} 偏高，代谢负担加重`);
+    r.metabolic.reasons.push({ code: "bmiHigh", params: { bmi: round1(bmi) } });
   } else if (bmi >= 24) {
     r.metabolic.offset += 1.5;
-    r.metabolic.reasons.push(`BMI ${round1(bmi)} 略超标准`);
+    r.metabolic.reasons.push({ code: "bmiOver", params: { bmi: round1(bmi) } });
   } else if (bmi < 18.5) {
     r.metabolic.offset += 1;
-    r.metabolic.reasons.push(`BMI ${round1(bmi)} 偏低`);
+    r.metabolic.reasons.push({ code: "bmiLow", params: { bmi: round1(bmi) } });
   }
   if (a.dietQuality >= 4) {
     r.metabolic.offset -= 1;
-    r.metabolic.reasons.push("饮食质量较高，抗炎摄入充足");
+    r.metabolic.reasons.push({ code: "dietGood" });
   } else if (a.dietQuality <= 2) {
     r.metabolic.offset += 1.5;
-    r.metabolic.reasons.push("饮食加工食品偏多，影响血糖平稳");
+    r.metabolic.reasons.push({ code: "dietPoor" });
   }
 
   // 肌肉骨骼：力量频率（+ 标准测体能微测试修正）
   if (a.strengthDays >= 2) {
     r.musculoskeletal.offset -= 2;
-    r.musculoskeletal.reasons.push("每周 ≥2 次力量训练有效对抗肌肉流失");
+    r.musculoskeletal.reasons.push({ code: "strengthGood" });
   } else if (a.strengthDays === 1) {
     r.musculoskeletal.offset -= 0.5;
   } else {
     r.musculoskeletal.offset += 1.5;
-    r.musculoskeletal.reasons.push("缺少力量训练，肌肉逐年流失");
+    r.musculoskeletal.reasons.push({ code: "strengthNone" });
   }
   if (t) {
     let adjust = 0;
@@ -109,52 +111,52 @@ function dimensionOffsets(
       else if (t.gripKg <= 28) adjust += 0.5;
     }
     r.musculoskeletal.offset += adjust;
-    if (adjust < 0) r.musculoskeletal.reasons.push("体能微测试结果好于同龄参考");
-    if (adjust > 0) r.musculoskeletal.reasons.push("体能微测试低于同龄参考值");
+    if (adjust < 0) r.musculoskeletal.reasons.push({ code: "fitnessGood" });
+    if (adjust > 0) r.musculoskeletal.reasons.push({ code: "fitnessPoor" });
   }
 
   // 睡眠恢复：时长 + 规律性
   if (a.sleepHours < 6) {
     r.sleep.offset += 2;
-    r.sleep.reasons.push("睡眠不足 6 小时，深睡修复受限");
+    r.sleep.reasons.push({ code: "sleepShort" });
   } else if (a.sleepHours < 7) {
     r.sleep.offset += 0.5;
   } else if (a.sleepHours > 9) {
     r.sleep.offset += 0.5;
-    r.sleep.reasons.push("睡眠时长偏长，注意睡眠质量");
+    r.sleep.reasons.push({ code: "sleepLong" });
   } else {
-    r.sleep.reasons.push("睡眠时长处于修复区间");
+    r.sleep.reasons.push({ code: "sleepOk" });
   }
   if (a.sleepRegularity >= 4) {
     r.sleep.offset -= 1;
   } else if (a.sleepRegularity <= 2) {
     r.sleep.offset += 1;
-    r.sleep.reasons.push("作息不规律，入睡时间波动大");
+    r.sleep.reasons.push({ code: "sleepIrregular" });
   }
 
   // 生活方式：吸烟 / 饮酒 / 压力 / 久坐
   if (a.smoking) {
     r.lifestyle.offset += 3;
-    r.lifestyle.reasons.push("吸烟是证据最明确的加速衰老因子");
+    r.lifestyle.reasons.push({ code: "smoking" });
   }
   if (a.drinking >= 2) {
     r.lifestyle.offset += 1.5;
-    r.lifestyle.reasons.push("饮酒频率偏高");
+    r.lifestyle.reasons.push({ code: "drinkingHigh" });
   } else if (a.drinking === 1) {
     r.lifestyle.offset += 0.5;
   }
   if (a.stress >= 4) {
     r.lifestyle.offset += 1.5;
-    r.lifestyle.reasons.push("压力自评偏高，慢性炎症风险上升");
+    r.lifestyle.reasons.push({ code: "stressHigh" });
   } else if (a.stress === 3) {
     r.lifestyle.offset += 0.5;
   }
   if (a.sittingHours > 10) {
     r.lifestyle.offset += 2.5;
-    r.lifestyle.reasons.push("每日久坐超过 10 小时");
+    r.lifestyle.reasons.push({ code: "sitting10" });
   } else if (a.sittingHours > 8) {
     r.lifestyle.offset += 1.5;
-    r.lifestyle.reasons.push("每日久坐超过 8 小时，血流瘀滞");
+    r.lifestyle.reasons.push({ code: "sitting8" });
   } else if (a.sittingHours < 4) {
     r.lifestyle.offset -= 0.5;
   }
@@ -181,10 +183,9 @@ export function computeBioAge(
     bioAge += offset * d.weight;
     return {
       key: d.key,
-      label: d.label,
       age: round1(calAge + offset),
       offset: round1(offset),
-      reasons: reasons.length ? reasons : ["该维度接近同龄平均水平"],
+      reasons: reasons.length ? reasons : [{ code: "neutral" }],
     };
   });
 

@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useI18n } from "@/lib/i18n/client";
 
 export interface TrendPoint {
   day: string; // M/D
@@ -31,6 +32,8 @@ export function TrendChart({
   data: TrendPoint[];
   domain: [number, number];
 }) {
+  const { t, f } = useI18n();
+  const unit = t.common.years;
   return (
     <div className="h-72 w-full sm:h-80">
       <ResponsiveContainer width="100%" height="100%">
@@ -58,11 +61,15 @@ export function TrendChart({
               return (
                 <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
                   <p className="mb-1 font-medium text-slate-500">{label}</p>
-                  <p className="text-emerald-600">预测生理年龄 {p.predicted.toFixed(1)} 岁</p>
-                  <p className="text-slate-400">日历年龄 {p.calendar} 岁</p>
+                  <p className="text-emerald-600">
+                    {f(t.trends.chartPredicted, { age: p.predicted.toFixed(1), unit })}
+                  </p>
+                  <p className="text-slate-400">
+                    {f(t.trends.chartCalendar, { age: p.calendar, unit })}
+                  </p>
                   {p.measured !== null && (
                     <p className="mt-0.5 font-medium text-slate-800">
-                      实测 {p.measured.toFixed(1)} 岁
+                      {f(t.trends.chartMeasured, { age: p.measured.toFixed(1), unit })}
                     </p>
                   )}
                 </div>
@@ -90,7 +97,12 @@ export function TrendChart({
             y={data[0]?.calendar}
             stroke="#cbd5e1"
             strokeDasharray="6 4"
-            label={{ value: "日历年龄", position: "insideTopRight", fontSize: 10, fill: "#94a3b8" }}
+            label={{
+              value: t.trends.chartCalendarLine,
+              position: "insideTopRight",
+              fontSize: 10,
+              fill: "#94a3b8",
+            }}
           />
           {/* 预测轨迹 */}
           <Line

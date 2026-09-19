@@ -5,10 +5,12 @@ export function NetRing({
   asset,
   debt,
   net,
+  label,
 }: {
   asset: number;
   debt: number;
   net: number;
+  label: string;
 }) {
   const R = 52;
   const C = 2 * Math.PI * R;
@@ -55,7 +57,7 @@ export function NetRing({
           {net > 0 ? "+" : ""}
           {net}
         </span>
-        <span className="mt-0.5 text-xs text-slate-400">今日净值</span>
+        <span className="mt-0.5 text-xs text-slate-400">{label}</span>
       </div>
     </div>
   );

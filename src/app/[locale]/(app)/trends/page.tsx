@@ -3,14 +3,31 @@ import { Badge, Card, SectionTitle } from "@/components/ui";
 import { agingRate } from "@/lib/bioage";
 import { fmt1 } from "@/lib/domain";
 import { getDailySummaries, getLatestMeasurement, getMeasurements } from "@/lib/data/queries";
+import { getDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { resolveLocale } from "@/lib/i18n/server";
 import { TrendChart, type TrendPoint } from "./trend-chart";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "趋势" };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const locale = await resolveLocale(params);
+  return { title: getDictionary(locale).trends.title };
+}
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
-export default async function TrendsPage() {
+export default async function TrendsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const locale = await resolveLocale(params);
+  const t = getDictionary(locale);
+  const f = interpolate;
   const [summaries, measurements, latest] = await Promise.all([
     getDailySummaries(60),
     getMeasurements(50),
@@ -32,9 +49,10 @@ export default async function TrendsPage() {
       if (dateOf(m.createdAt) <= s.date) anchorIdx = j;
     });
     const m = anchorIdx >= 0 ? msAsc[anchorIdx] : msAsc[0];
-    const anchorDayIdx = anchorIdx >= 0
-      ? summaries.findIndex((x) => x.date === dateOf(msAsc[anchorIdx].createdAt))
-      : -1;
+    const anchorDayIdx =
+      anchorIdx >= 0
+        ? summaries.findIndex((x) => x.date === dateOf(msAsc[anchorIdx].createdAt))
+        : -1;
     const anchorPrefix = anchorDayIdx >= 0 ? prefix[anchorDayIdx] : 0;
     const predicted = round1(m.bioAge + prefix[i] - anchorPrefix);
     // 预测带宽度随距锚点时间展宽（快测 ±3 岁置信度的时间衰减示意）
@@ -62,8 +80,10 @@ export default async function TrendsPage() {
   const predictedToday = todayPoint?.predicted ?? latest?.bioAge ?? null;
   const calendarAge = latest?.calendarAge ?? null;
   const perDay = rates !== null ? rates / 30 : null;
-  const in5y = predictedToday !== null && perDay !== null ? round1(predictedToday + perDay * 365 * 5) : null;
-  const in10y = predictedToday !== null && perDay !== null ? round1(predictedToday + perDay * 365 * 10) : null;
+  const in5y =
+    predictedToday !== null && perDay !== null ? round1(predictedToday + perDay * 365 * 5) : null;
+  const in10y =
+    predictedToday !== null && perDay !== null ? round1(predictedToday + perDay * 365 * 10) : null;
   const calIn5 = calendarAge !== null ? calendarAge + 5 : null;
   const calIn10 = calendarAge !== null ? calendarAge + 10 : null;
 
@@ -74,9 +94,12 @@ export default async function TrendsPage() {
     if (delta > 0) {
       const days = Math.ceil(delta / -perDay);
       const target = new Date(Date.now() + days * 86400000);
-      milestone = `${target.getFullYear()} 年 ${target.getMonth() + 1} 月`;
+      milestone = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+        year: "numeric",
+        month: "long",
+      }).format(target);
     } else {
-      milestone = "已达成";
+      milestone = t.trends.milestoneReached;
     }
   }
 
@@ -89,19 +112,22 @@ export default async function TrendsPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-bold text-slate-900">趋势</h1>
-        <p className="mt-0.5 text-sm text-slate-500">行为积累 → 复测验证的因果关系</p>
+        <h1 className="text-xl font-bold text-slate-900">{t.trends.title}</h1>
+        <p className="mt-0.5 text-sm text-slate-500">{t.trends.sub}</p>
       </header>
 
       {/* 双线年龄曲线 */}
       <Card className="p-5">
         <SectionTitle
-          title="生理年龄曲线"
-          sub="连续线为预测轨迹 · 实心点为实测值 · 阴影带为预测区间"
+          title={t.trends.chartTitle}
+          sub={t.trends.chartSub}
           right={
             predictedToday !== null && calendarAge !== null ? (
               <Badge tone={predictedToday <= calendarAge ? "positive" : "negative"}>
-                预测 {fmt1(predictedToday)} 岁
+                {f(t.trends.predictedBadge, {
+                  age: fmt1(predictedToday),
+                  unit: t.common.years,
+                })}
               </Badge>
             ) : undefined
           }
@@ -112,7 +138,7 @@ export default async function TrendsPage() {
       {/* 核心指标 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="p-4">
-          <p className="text-xs text-slate-400">老化速率</p>
+          <p className="text-xs text-slate-400">{t.trends.agingRate}</p>
           <p
             className={
               rates === null
@@ -123,18 +149,20 @@ export default async function TrendsPage() {
             }
           >
             {rates === null ? "—" : `${rates > 0 ? "+" : ""}${fmt1(rates)}`}
-            <span className="ml-1 text-xs font-normal text-slate-400">岁/30天</span>
+            <span className="ml-1 text-xs font-normal text-slate-400">
+              {t.common.perMonth}
+            </span>
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs text-slate-400">今日预测年龄</p>
+          <p className="text-xs text-slate-400">{t.trends.todayPredicted}</p>
           <p className="text-xl font-bold tabular-nums text-slate-900">
             {predictedToday !== null ? fmt1(predictedToday) : "—"}
-            <span className="ml-1 text-xs font-normal text-slate-400">岁</span>
+            <span className="ml-1 text-xs font-normal text-slate-400">{t.common.years}</span>
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs text-slate-400">Δ 年龄差</p>
+          <p className="text-xs text-slate-400">{t.trends.deltaAge}</p>
           <p
             className={
               predictedToday !== null && calendarAge !== null
@@ -147,56 +175,64 @@ export default async function TrendsPage() {
             {predictedToday !== null && calendarAge !== null
               ? `${predictedToday - calendarAge > 0 ? "+" : ""}${fmt1(predictedToday - calendarAge)}`
               : "—"}
-            <span className="ml-1 text-xs font-normal text-slate-400">岁</span>
+            <span className="ml-1 text-xs font-normal text-slate-400">{t.common.years}</span>
           </p>
         </Card>
         <Card className="p-4">
-          <p className="text-xs text-slate-400">里程碑预测日</p>
+          <p className="text-xs text-slate-400">{t.trends.milestone}</p>
           <p className="text-sm font-semibold leading-6 text-slate-900">
-            {milestone === null ? "复测两次后可预测" : milestone === "已达成" ? "生理年龄已年轻于日历年龄 🎉" : `${milestone}追上日历年龄`}
+            {milestone === null
+              ? t.trends.milestoneNeedTwo
+              : milestone === t.trends.milestoneReached
+                ? milestone
+                : f(t.trends.milestoneCatchUp, { date: milestone })}
           </p>
         </Card>
       </div>
 
       {/* 基线预测（PRD 5.1：若维持当前习惯） */}
       <Card className="p-5">
-        <SectionTitle title="基线预测" sub="若维持当前习惯，5 / 10 年后的对比" />
+        <SectionTitle title={t.trends.baselineTitle} sub={t.trends.baselineSub} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-500">5 年后</p>
+            <p className="text-sm font-medium text-slate-500">{t.trends.in5y}</p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold tabular-nums text-slate-900">
                 {in5y !== null ? fmt1(in5y) : "—"}
               </span>
               <span className="text-sm text-slate-400">
-                预测 vs 日历 {calIn5 ?? "—"}
+                {f(t.trends.predictedVsCalendar, { age: calIn5 ?? "—" })}
               </span>
             </div>
             {in5y !== null && calIn5 !== null && (
               <p className="mt-1 text-xs text-emerald-600">
-                {in5y <= calIn5 ? `维持住了 ${fmt1(calIn5 - in5y)} 岁的优势` : `将落后日历年龄 ${fmt1(in5y - calIn5)} 岁`}
+                {in5y <= calIn5
+                  ? f(t.trends.keepAdvantage, { n: fmt1(calIn5 - in5y) })
+                  : f(t.trends.fallBehind, { n: fmt1(in5y - calIn5) })}
               </p>
             )}
           </div>
           <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-500">10 年后</p>
+            <p className="text-sm font-medium text-slate-500">{t.trends.in10y}</p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold tabular-nums text-slate-900">
                 {in10y !== null ? fmt1(in10y) : "—"}
               </span>
               <span className="text-sm text-slate-400">
-                预测 vs 日历 {calIn10 ?? "—"}
+                {f(t.trends.predictedVsCalendar, { age: calIn10 ?? "—" })}
               </span>
             </div>
             {in10y !== null && calIn10 !== null && (
               <p className="mt-1 text-xs text-emerald-600">
-                {in10y <= calIn10 ? `维持住了 ${fmt1(calIn10 - in10y)} 岁的优势` : `将落后日历年龄 ${fmt1(in10y - calIn10)} 岁`}
+                {in10y <= calIn10
+                  ? f(t.trends.keepAdvantage, { n: fmt1(calIn10 - in10y) })
+                  : f(t.trends.fallBehind, { n: fmt1(in10y - calIn10) })}
               </p>
             )}
           </div>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-slate-400">
-          基线预测由近 60 天行为净值外推，仅供动机参考，不构成医学判断。
+          {t.trends.baselineFootnote}
         </p>
       </Card>
 
@@ -204,11 +240,13 @@ export default async function TrendsPage() {
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-5">
         <div className="flex items-center gap-2">
           <SparklesIcon className="size-4 text-slate-400" />
-          <span className="text-sm font-semibold text-slate-500">场景模拟器</span>
-          <Badge>V1.1 开放</Badge>
+          <span className="text-sm font-semibold text-slate-500">
+            {t.trends.simulatorTitle}
+          </span>
+          <Badge>{t.trends.simulatorBadge}</Badge>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-slate-400">
-          拖动滑块模拟「戒烟」「每天走 8000 步」「23 点前睡」，即时查看 1 / 5 年后的生理年龄变化。
+          {t.trends.simulatorDesc}
         </p>
       </div>
     </div>

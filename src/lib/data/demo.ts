@@ -39,13 +39,9 @@ function seedDimension(bioAge: number, calAge: number, spread: number, rnd: () =
     const age = round1(calAge + offset);
     return {
       key: d.key,
-      label: d.label,
       age,
       offset,
-      reasons:
-        offset > 0
-          ? ["该维度指标弱于同龄平均，建议优先改善"]
-          : ["该维度指标优于同龄平均水平"],
+      reasons: offset > 0 ? [{ code: "demoWeak" }] : [{ code: "demoStrong" }],
     };
   });
 }

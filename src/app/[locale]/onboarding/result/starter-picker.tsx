@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { savePlanAction } from "@/lib/actions";
 import type { BehaviorDef } from "@/lib/domain";
+import { useI18n } from "@/lib/i18n/client";
 import { CheckIcon } from "@/components/icons";
 import { Button, Card, SectionTitle, cn } from "@/components/ui";
 
 /** 选择 3 个启动行为（PRD 用户旅程步骤 6：只推荐高杠杆 + 低门槛项） */
 export function StarterPicker({ recommendations }: { recommendations: BehaviorDef[] }) {
   const router = useRouter();
+  const { t, href, f, behavior } = useI18n();
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +26,7 @@ export function StarterPicker({ recommendations }: { recommendations: BehaviorDe
     setSaving(true);
     setError("");
     const res = await savePlanAction(selected);
-    if (res.ok) router.push("/today");
+    if (res.ok) router.push(href("/today"));
     else {
       setError(res.error);
       setSaving(false);
@@ -34,11 +36,12 @@ export function StarterPicker({ recommendations }: { recommendations: BehaviorDe
   return (
     <Card className="mt-4 p-5 sm:p-6">
       <SectionTitle
-        title="选择你的启动行为"
-        sub={`从推荐中选 1–3 个（已选 ${selected.length}/3）`}
+        title={t.onboarding.starter.title}
+        sub={f(t.onboarding.starter.sub, { n: selected.length })}
       />
       <div className="space-y-2">
         {recommendations.map((b) => {
+          const def = behavior(b.key);
           const active = selected.includes(b.key);
           return (
             <button
@@ -63,11 +66,13 @@ export function StarterPicker({ recommendations }: { recommendations: BehaviorDe
               </span>
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{b.label}</span>
-                  <span className="text-xs font-medium text-emerald-600">+{b.score}/天</span>
+                  <span className="text-sm font-semibold text-slate-900">{def.label}</span>
+                  <span className="text-xs font-medium text-emerald-600">
+                    {f(t.onboarding.starter.perDay, { n: b.score })}
+                  </span>
                 </span>
                 <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
-                  {b.criteria} · {b.mechanism}
+                  {def.criteria} · {def.mechanism}
                 </span>
               </span>
             </button>
@@ -76,13 +81,13 @@ export function StarterPicker({ recommendations }: { recommendations: BehaviorDe
       </div>
       {error && <p className="mt-3 text-sm text-amber-600">{error}</p>}
       <Button onClick={onDone} disabled={saving} className="mt-4 w-full py-3 text-base">
-        {saving ? "保存中…" : "开始我的逆龄之旅"}
+        {saving ? t.common.saving : t.onboarding.starter.cta}
       </Button>
       <button
-        onClick={() => router.push("/today")}
+        onClick={() => router.push(href("/today"))}
         className="mt-2 w-full py-2 text-center text-sm text-slate-400 hover:text-slate-600"
       >
-        暂不选择，直接进入
+        {t.onboarding.starter.skip}
       </button>
     </Card>
   );

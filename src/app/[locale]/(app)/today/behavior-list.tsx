@@ -10,6 +10,7 @@ import {
 } from "@/lib/domain";
 import { CheckIcon, SparklesIcon } from "@/components/icons";
 import { Badge, Card, SectionTitle, cn } from "@/components/ui";
+import { useI18n } from "@/lib/i18n/client";
 
 export function TodayBehaviorList({
   initialSummary,
@@ -18,6 +19,7 @@ export function TodayBehaviorList({
   initialSummary: DailySummary;
   planKeys: string[];
 }) {
+  const { t, f, behavior } = useI18n();
   const [summary, setSummary] = useState(initialSummary);
   const [pending, startTransition] = useTransition();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -51,65 +53,74 @@ export function TodayBehaviorList({
       {/* 正向分支：健康资产 */}
       <Card className="p-5">
         <SectionTitle
-          title="健康资产"
-          sub="正向行为分支"
+          title={t.today.assetTitle}
+          sub={t.today.assetSub}
           right={<Badge tone="positive">+{summary.positive}</Badge>}
         />
         <ul className="space-y-2">
-          {POSITIVE_BEHAVIORS.map((b) => (
-            <li key={b.key}>
-              <CheckInItem
-                label={b.label}
-                criteria={b.criteria}
-                score={b.score}
-                direction={1}
-                inPlan={planKeys.includes(b.key)}
-                active={done(b.key)}
-                disabled={pending && busyKey === b.key}
-                flashing={flash?.key === b.key}
-                onClick={() => toggle(b.key)}
-              />
-            </li>
-          ))}
+          {POSITIVE_BEHAVIORS.map((b) => {
+            const def = behavior(b.key);
+            return (
+              <li key={b.key}>
+                <CheckInItem
+                  label={def.label}
+                  criteria={def.criteria}
+                  score={b.score}
+                  direction={1}
+                  inPlan={planKeys.includes(b.key)}
+                  planBadge={t.common.planBadge}
+                  active={done(b.key)}
+                  disabled={pending && busyKey === b.key}
+                  flashing={flash?.key === b.key}
+                  onClick={() => toggle(b.key)}
+                />
+              </li>
+            );
+          })}
         </ul>
       </Card>
 
       {/* 负向分支：老化负债 */}
       <Card className="p-5">
         <SectionTitle
-          title="老化负债"
-          sub="负向行为分支"
+          title={t.today.debtTitle}
+          sub={t.today.debtSub}
           right={<Badge tone="negative">−{summary.negative}</Badge>}
         />
         <ul className="space-y-2">
-          {NEGATIVE_BEHAVIORS.map((b) => (
-            <li key={b.key}>
-              <CheckInItem
-                label={b.label}
-                criteria={b.criteria}
-                score={b.score}
-                direction={-1}
-                active={done(b.key)}
-                disabled={pending && busyKey === b.key}
-                flashing={flash?.key === b.key}
-                onClick={() => toggle(b.key)}
-              />
-            </li>
-          ))}
+          {NEGATIVE_BEHAVIORS.map((b) => {
+            const def = behavior(b.key);
+            return (
+              <li key={b.key}>
+                <CheckInItem
+                  label={def.label}
+                  criteria={def.criteria}
+                  score={b.score}
+                  direction={-1}
+                  active={done(b.key)}
+                  disabled={pending && busyKey === b.key}
+                  flashing={flash?.key === b.key}
+                  onClick={() => toggle(b.key)}
+                />
+              </li>
+            );
+          })}
         </ul>
         {/* 负反馈必带挽回方案（PRD 4.1.3） */}
         {anyNegative && remedies.length > 0 && (
           <div className="mt-4 rounded-xl bg-amber-50/70 p-3.5 text-xs leading-relaxed text-amber-800">
-            <p className="mb-1.5 font-semibold">挽回方案</p>
+            <p className="mb-1.5 font-semibold">{t.today.remedyTitle}</p>
             <ul className="list-inside list-disc space-y-1">
-              {remedies
-                .filter((r) => r.remedy)
-                .map((r) => (
+              {remedies.map((r) => {
+                const def = behavior(r.key);
+                if (!def.remedy) return null;
+                return (
                   <li key={r.key}>
-                    <span className="font-medium">{r.label}：</span>
-                    {r.remedy}
+                    <span className="font-medium">{def.label}: </span>
+                    {def.remedy}
                   </li>
-                ))}
+                );
+              })}
             </ul>
           </div>
         )}
@@ -121,7 +132,9 @@ export function TodayBehaviorList({
           <div className="animate-[fade-up_1.4s_ease-out_forwards] rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
             <span className="inline-flex items-center gap-1.5">
               <SparklesIcon className="size-4" />
-              {flash.score > 0 ? `+${flash.score} · 今天年轻一点点` : `${flash.score} · 明天可以追回`}
+              {flash.score > 0
+                ? f(t.today.flashPositive, { n: flash.score })
+                : f(t.today.flashNegative, { n: flash.score })}
             </span>
           </div>
         </div>
@@ -136,6 +149,7 @@ function CheckInItem({
   score,
   direction,
   inPlan,
+  planBadge,
   active,
   disabled,
   flashing,
@@ -146,6 +160,7 @@ function CheckInItem({
   score: number;
   direction: 1 | -1;
   inPlan?: boolean;
+  planBadge?: string;
   active: boolean;
   disabled: boolean;
   flashing: boolean;
@@ -183,7 +198,7 @@ function CheckInItem({
           <span className="text-sm font-medium text-slate-900">{label}</span>
           {inPlan && (
             <span className="rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-medium text-slate-500">
-              计划中
+              {planBadge}
             </span>
           )}
         </span>
